@@ -1,0 +1,542 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>SoundCloud AutoMix</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+      background: radial-gradient(circle at top, #1f2933, #050816);
+      color: #e5e7eb;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .app {
+      width: 95%;
+      max-width: 800px;
+      background: rgba(15,23,42,0.98);
+      border-radius: 18px;
+      padding: 24px 24px 20px;
+      box-shadow: 0 24px 60px rgba(0,0,0,0.8);
+      border: 1px solid rgba(148,163,184,0.4);
+    }
+    h1 {
+      margin: 0 0 4px;
+      font-size: 24px;
+    }
+    .subtitle {
+      font-size: 12px;
+      color: #9ca3af;
+      margin-bottom: 16px;
+    }
+    .row {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 10px;
+      flex-wrap: wrap;
+    }
+    input[type="text"] {
+      flex: 1;
+      padding: 8px 10px;
+      border-radius: 10px;
+      border: 1px solid #4b5563;
+      background: #020617;
+      color: #e5e7eb;
+      font-size: 13px;
+      outline: none;
+    }
+    input[type="text"]:focus {
+      border-color: #22c55e;
+      box-shadow: 0 0 0 1px rgba(34,197,94,0.5);
+    }
+    button {
+      border: none;
+      padding: 8px 12px;
+      border-radius: 999px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      background: #22c55e;
+      color: #020617;
+      transition: transform 0.12s ease, box-shadow 0.12s ease, background 0.12s ease;
+      white-space: nowrap;
+    }
+    button:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 8px 20px rgba(34,197,94,0.3);
+    }
+    button.secondary {
+      background: #111827;
+      color: #e5e7eb;
+      border: 1px solid #4b5563;
+      box-shadow: none;
+    }
+    button.secondary:hover {
+      background: #020617;
+      box-shadow: 0 8px 20px rgba(0,0,0,0.5);
+    }
+    button.danger {
+      background: #ef4444;
+      color: #fee2e2;
+    }
+    button[disabled] {
+      opacity: .5;
+      cursor: default;
+      box-shadow: none;
+      transform: none;
+    }
+    .status {
+      font-size: 12px;
+      color: #a5b4fc;
+      margin-bottom: 6px;
+    }
+    .tracks {
+      margin-top: 10px;
+      max-height: 260px;
+      overflow-y: auto;
+      padding-right: 6px;
+    }
+    .track {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      align-items: center;
+      padding: 6px 8px;
+      border-radius: 10px;
+      background: rgba(15,23,42,0.7);
+      border: 1px solid transparent;
+      font-size: 13px;
+    }
+    .track + .track {
+      margin-top: 4px;
+    }
+    .track.active {
+      border-color: #22c55e;
+      background: linear-gradient(90deg,#064e3b,#020617);
+    }
+    .track-title {
+      font-weight: 500;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .track-meta {
+      font-size: 11px;
+      color: #9ca3af;
+    }
+    .pill {
+      font-size: 11px;
+      padding: 2px 8px;
+      border-radius: 999px;
+      background: rgba(15,118,110,0.4);
+      color: #a7f3d0;
+      white-space: nowrap;
+    }
+    .footer {
+      margin-top: 10px;
+      font-size: 11px;
+      color: #6b7280;
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    .footer a { color: #a5b4fc; text-decoration: none; }
+    .footer a:hover { text-decoration: underline; }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <h1>SoundCloud AutoMix</h1>
+    <div class="subtitle">
+      Paste a SoundCloud <b>playlist URL</b> or <b>track URL</b>, load tracks, then hit <b>Start AutoMix</b>.
+    </div>
+
+    <div class="row">
+      <input
+        type="text"
+        id="scUrl"
+        placeholder="https://soundcloud.com/artist/playlist-or-track"
+      />
+      <button id="addBtn">Add URL</button>
+      <button class="secondary" id="clearBtn">Clear</button>
+    </div>
+
+    <div class="row">
+      <button id="startBtn">Start AutoMix</button>
+      <button class="secondary" id="stopBtn" disabled>Stop</button>
+      <button class="secondary" id="shuffleBtn">Shuffle</button>
+    </div>
+
+    <div class="status" id="status">
+      Paste a SoundCloud link above and click <b>Add URL</b>.
+    </div>
+
+    <div class="tracks" id="trackList"></div>
+
+    <div class="footer">
+      <span>Crossfade: 6s • Plays full streamable tracks only.</span>
+      <span>Powered by SoundCloud public API – for personal use, respect their <a href="https://soundcloud.com/pages/privacy" target="_blank" rel="noreferrer">terms</a>.</span>
+    </div>
+  </div>
+
+  <script>
+    // 1) PUT YOUR CLIENT ID HERE (from Network tab)
+    const CLIENT_ID = "PUT_YOUR_SOUNDCLOUD_CLIENT_ID_HERE";
+
+    // 2) Basic state
+    const tracks = []; // { title, artist, duration, streamUrl }
+    let currentIndex = -1;
+    let isPlaying = false;
+    let audioA = new Audio();
+    let audioB = new Audio();
+    let usingA = true;
+    let crossfadeSeconds = 6;
+    let crossfadeTimer = null;
+    let scheduleTimer = null;
+
+    const scUrlInput = document.getElementById("scUrl");
+    const trackListEl = document.getElementById("trackList");
+    const statusEl = document.getElementById("status");
+    const addBtn = document.getElementById("addBtn");
+    const clearBtn = document.getElementById("clearBtn");
+    const startBtn = document.getElementById("startBtn");
+    const stopBtn = document.getElementById("stopBtn");
+    const shuffleBtn = document.getElementById("shuffleBtn");
+
+    function logStatus(msg) {
+      console.log(msg);
+      statusEl.textContent = msg;
+    }
+
+    function msToTime(ms) {
+      if (!ms && ms !== 0) return "";
+      const totalSec = Math.round(ms / 1000);
+      const m = Math.floor(totalSec / 60);
+      const s = (totalSec % 60).toString().padStart(2, "0");
+      return `${m}:${s}`;
+    }
+
+    function renderTrackList() {
+      trackListEl.innerHTML = "";
+      if (!tracks.length) {
+        const div = document.createElement("div");
+        div.textContent = "No tracks loaded yet.";
+        div.style.fontSize = "12px";
+        div.style.color = "#6b7280";
+        trackListEl.appendChild(div);
+        return;
+      }
+      tracks.forEach((t, i) => {
+        const row = document.createElement("div");
+        row.className = "track" + (i === currentIndex ? " active" : "");
+        const left = document.createElement("div");
+        const title = document.createElement("div");
+        title.className = "track-title";
+        title.textContent = t.title || "Untitled";
+        const meta = document.createElement("div");
+        meta.className = "track-meta";
+        meta.textContent = `${t.artist || "Unknown artist"} • ${msToTime(t.duration)}`;
+        left.appendChild(title);
+        left.appendChild(meta);
+
+        const right = document.createElement("div");
+        const pill = document.createElement("div");
+        pill.className = "pill";
+        pill.textContent = `#${i + 1}`;
+        right.appendChild(pill);
+
+        row.appendChild(left);
+        row.appendChild(right);
+        row.onclick = () => {
+          if (!isPlaying) {
+            startAutomix(i);
+          } else {
+            playSpecific(i);
+          }
+        };
+        trackListEl.appendChild(row);
+      });
+    }
+
+    async function resolveSoundCloudUrl(url) {
+      if (!CLIENT_ID || CLIENT_ID.startsWith("PUT_")) {
+        alert("Please set your SoundCloud CLIENT_ID at the top of index.html first.");
+        throw new Error("Missing client id");
+      }
+
+      const resolveUrl =
+        "https://api.soundcloud.com/resolve?url=" +
+        encodeURIComponent(url.trim()) +
+        "&client_id=" +
+        encodeURIComponent(CLIENT_ID);
+
+      const res = await fetch(resolveUrl);
+      if (!res.ok) {
+        throw new Error("Resolve failed: " + res.status);
+      }
+      const data = await res.json();
+      return data;
+    }
+
+    async function getStreamUrlFromTrack(track) {
+      // Old API: track.stream_url + ?client_id
+      if (track.stream_url) {
+        return track.stream_url + "?client_id=" + encodeURIComponent(CLIENT_ID);
+      }
+
+      // Newer API: use media.transcodings → progressive or HLS
+      const media = track.media;
+      if (!media || !Array.isArray(media.transcodings)) {
+        throw new Error("No media transcodings for this track");
+      }
+
+      // Prefer progressive first, then HLS
+      let choice =
+        media.transcodings.find(t => t.format && t.format.protocol === "progressive") ||
+        media.transcodings.find(t => t.format && t.format.protocol === "hls") ||
+        media.transcodings[0];
+
+      if (!choice) throw new Error("No valid transcoding");
+
+      const infoRes = await fetch(choice.url + "?client_id=" + encodeURIComponent(CLIENT_ID));
+      if (!infoRes.ok) throw new Error("Failed to fetch stream URL");
+      const info = await infoRes.json();
+      if (!info.url) throw new Error("No stream URL returned");
+      return info.url;
+    }
+
+    async function addUrlHandler() {
+      const url = scUrlInput.value.trim();
+      if (!url) {
+        alert("Paste a SoundCloud track or playlist URL first.");
+        return;
+      }
+      try {
+        addBtn.disabled = true;
+        logStatus("Resolving SoundCloud URL…");
+        const data = await resolveSoundCloudUrl(url);
+        if (data.kind === "playlist") {
+          let added = 0;
+          for (const t of data.tracks || []) {
+            if (!t.streamable && t.streamable !== undefined) continue;
+            try {
+              const streamUrl = await getStreamUrlFromTrack(t);
+              tracks.push({
+                title: t.title,
+                artist: t.user && t.user.username,
+                duration: t.duration,
+                streamUrl
+              });
+              added++;
+            } catch (err) {
+              console.warn("Skip track (no stream):", t.title, err);
+            }
+          }
+          logStatus(`Loaded ${added} tracks from playlist "${data.title}".`);
+        } else if (data.kind === "track") {
+          if (data.streamable === false) {
+            logStatus("Track is not streamable.");
+          } else {
+            const streamUrl = await getStreamUrlFromTrack(data);
+            tracks.push({
+              title: data.title,
+              artist: data.user && data.user.username,
+              duration: data.duration,
+              streamUrl
+            });
+            logStatus(`Added track "${data.title}".`);
+          }
+        } else {
+          logStatus("Unsupported kind: " + data.kind);
+        }
+        renderTrackList();
+      } catch (err) {
+        console.error(err);
+        logStatus("Error: " + err.message);
+      } finally {
+        addBtn.disabled = false;
+      }
+    }
+
+    function clearAll() {
+      stopAutomix();
+      tracks.length = 0;
+      currentIndex = -1;
+      renderTrackList();
+      logStatus("Cleared track list.");
+    }
+
+    function shuffleTracks() {
+      for (let i = tracks.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [tracks[i], tracks[j]] = [tracks[j], tracks[i]];
+      }
+      currentIndex = -1;
+      renderTrackList();
+      logStatus("Shuffled track order.");
+    }
+
+    function getCurrentAudio() {
+      return usingA ? audioA : audioB;
+    }
+
+    function getNextAudio() {
+      return usingA ? audioB : audioA;
+    }
+
+    function stopTimers() {
+      if (crossfadeTimer) {
+        clearInterval(crossfadeTimer);
+        crossfadeTimer = null;
+      }
+      if (scheduleTimer) {
+        clearTimeout(scheduleTimer);
+        scheduleTimer = null;
+      }
+    }
+
+    async function playTrack(index, first = false) {
+      if (index < 0 || index >= tracks.length) return;
+      currentIndex = index;
+      renderTrackList();
+
+      const track = tracks[index];
+      const mainAudio = first ? audioA : getCurrentAudio();
+      const nextAudio = getNextAudio();
+
+      if (first) {
+        audioA.pause();
+        audioB.pause();
+        audioA = new Audio();
+        audioB = new Audio();
+        usingA = true;
+      }
+
+      stopTimers();
+
+      const active = getCurrentAudio();
+      active.src = track.streamUrl;
+      active.currentTime = 0;
+      active.volume = 1;
+
+      active.onended = () => {
+        // Safety fallback
+        playNext();
+      };
+
+      await active.play().catch(err => {
+        console.error("Play failed:", err);
+        logStatus("Playback blocked (browser autoplay?). Click anywhere then try again.");
+      });
+
+      logStatus(`Playing: ${track.title} — ${track.artist || ""}`);
+
+      const durationMs = track.duration || 180000;
+      const playTimeMs = Math.max(10000, durationMs - crossfadeSeconds * 1000);
+
+      scheduleTimer = setTimeout(() => {
+        crossfadeToNext();
+      }, playTimeMs);
+    }
+
+    function playNext() {
+      let nextIndex = currentIndex + 1;
+      if (nextIndex >= tracks.length) nextIndex = 0;
+      playTrack(nextIndex);
+    }
+
+    async function crossfadeToNext() {
+      if (!tracks.length) return;
+      stopTimers();
+
+      let nextIndex = currentIndex + 1;
+      if (nextIndex >= tracks.length) nextIndex = 0;
+      const track = tracks[nextIndex];
+
+      const from = getCurrentAudio();
+      const to = getNextAudio();
+
+      usingA = !usingA; // flip
+
+      to.src = track.streamUrl;
+      to.currentTime = 0;
+      to.volume = 0;
+
+      await to.play().catch(err => {
+        console.error("Next play failed:", err);
+      });
+
+      currentIndex = nextIndex;
+      renderTrackList();
+      logStatus(`Crossfading into: ${track.title} — ${track.artist || ""}`);
+
+      const steps = crossfadeSeconds * 20; // 50ms steps
+      let step = 0;
+      crossfadeTimer = setInterval(() => {
+        step++;
+        const p = step / steps;
+        from.volume = Math.max(0, 1 - p);
+        to.volume = Math.min(1, p);
+        if (step >= steps) {
+          clearInterval(crossfadeTimer);
+          crossfadeTimer = null;
+          from.pause();
+          from.volume = 1;
+          const durationMs = track.duration || 180000;
+          const playTimeMs = Math.max(10000, durationMs - crossfadeSeconds * 1000);
+          scheduleTimer = setTimeout(() => {
+            crossfadeToNext();
+          }, playTimeMs);
+        }
+      }, 50);
+    }
+
+    function startAutomix(startIndex = 0) {
+      if (!tracks.length) {
+        logStatus("Load some tracks first.");
+        return;
+      }
+      isPlaying = true;
+      startBtn.disabled = true;
+      stopBtn.disabled = false;
+      playTrack(startIndex, true);
+    }
+
+    function playSpecific(index) {
+      if (index < 0 || index >= tracks.length) return;
+      playTrack(index, true);
+    }
+
+    function stopAutomix() {
+      isPlaying = false;
+      stopTimers();
+      audioA.pause();
+      audioB.pause();
+      audioA.currentTime = 0;
+      audioB.currentTime = 0;
+      startBtn.disabled = false;
+      stopBtn.disabled = true;
+      logStatus("Stopped AutoMix.");
+    }
+
+    // Wire up buttons
+    addBtn.addEventListener("click", addUrlHandler);
+    clearBtn.addEventListener("click", clearAll);
+    shuffleBtn.addEventListener("click", shuffleTracks);
+    startBtn.addEventListener("click", () => startAutomix(0));
+    stopBtn.addEventListener("click", stopAutomix);
+    scUrlInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") addUrlHandler();
+    });
+
+    // initial render
+    renderTrackList();
+  </script>
+</body>
+</html>
