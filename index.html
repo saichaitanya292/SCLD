@@ -269,8 +269,8 @@
         alert("Please set your SoundCloud CLIENT_ID at the top of index.html first.");
         throw new Error("Missing client id");
       }
-
-    const resolveUrl =
+const trackUrl = document.getElementById("urlInput").value.trim();
+      const resolveUrl =
   "https://broad-lab-d489.saichaitanya292.workers.dev/?url=" +
   encodeURIComponent("https://api.soundcloud.com/resolve?url=" + trackUrl);
 
