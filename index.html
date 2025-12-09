@@ -264,17 +264,26 @@
       });
     }
 
+    // 🔧 FIXED FUNCTION
     async function resolveSoundCloudUrl(url) {
       if (!CLIENT_ID || CLIENT_ID.startsWith("PUT_")) {
         alert("Please set your SoundCloud CLIENT_ID at the top of index.html first.");
         throw new Error("Missing client id");
       }
-const trackUrl = document.getElementById("urlInput").value.trim();
-      const resolveUrl =
-  "https://broad-lab-d489.saichaitanya292.workers.dev/?url=" +
-  encodeURIComponent("https://api.soundcloud.com/resolve?url=" + trackUrl);
 
-      const res = await fetch(resolveUrl);
+      // Build the real SoundCloud resolve endpoint using the URL *argument*
+      const scResolveEndpoint =
+        "https://api.soundcloud.com/resolve?url=" +
+        encodeURIComponent(url) +
+        "&client_id=" +
+        encodeURIComponent(CLIENT_ID);
+
+      // Send that through your Cloudflare Worker proxy
+      const proxiedUrl =
+        "https://broad-lab-d489.saichaitanya292.workers.dev/?url=" +
+        encodeURIComponent(scResolveEndpoint);
+
+      const res = await fetch(proxiedUrl);
       if (!res.ok) {
         throw new Error("Resolve failed: " + res.status);
       }
@@ -405,8 +414,6 @@ const trackUrl = document.getElementById("urlInput").value.trim();
       renderTrackList();
 
       const track = tracks[index];
-      const mainAudio = first ? audioA : getCurrentAudio();
-      const nextAudio = getNextAudio();
 
       if (first) {
         audioA.pause();
@@ -424,7 +431,6 @@ const trackUrl = document.getElementById("urlInput").value.trim();
       active.volume = 1;
 
       active.onended = () => {
-        // Safety fallback
         playNext();
       };
 
