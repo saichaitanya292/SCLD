@@ -270,11 +270,9 @@
         throw new Error("Missing client id");
       }
 
-      const resolveUrl =
-        "https://api.soundcloud.com/resolve?url=" +
-        encodeURIComponent(url.trim()) +
-        "&client_id=" +
-        encodeURIComponent(CLIENT_ID);
+    const resolveUrl =
+  "https://broad-lab-d489.saichaitanya292.workers.dev/?url=" +
+  encodeURIComponent("https://api.soundcloud.com/resolve?url=" + trackUrl);
 
       const res = await fetch(resolveUrl);
       if (!res.ok) {
